@@ -17,7 +17,7 @@ int main() {
 
 		printf("\tClock rate: %d MHz\n", deviceProp.clockRate / 1000);
 		printf("\tNumber of streaming multiprocessors: %d\n", deviceProp.multiProcessorCount);
-		printf("\tNumber of cores: %d\n", 2 * _ConvertSMVer2Cores(deviceProp.major, deviceProp.minor));
+		printf("\tNumber of cores: %d\n", deviceProp.multiProcessorCount * _ConvertSMVer2Cores(deviceProp.major, deviceProp.minor));
 		printf("\tWarp size: %d\n", deviceProp.warpSize);
 		printf("\tAmount of global memory: %lu bytes\n", (unsigned long)deviceProp.totalGlobalMem);
 		printf("\tAmount of constant memory: %lu bytes\n", (unsigned long)deviceProp.totalConstMem);
