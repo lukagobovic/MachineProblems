@@ -1,3 +1,6 @@
+//Luka Gobovic
+//20215231
+//MP3 Part 2
 #include <stdio.h>
 #include <stdlib.h>
 #include <cuda_runtime.h>
@@ -5,8 +8,6 @@
 #include <curand.h>
 #include <time.h>
 #include <device_launch_parameters.h>
-
-#define BLOCK_WIDTH 16
 
 __global__ void matrixMultiplication(float *M, float *N, float *P, int matrixSize) {
 	int row = blockIdx.y * blockDim.y + threadIdx.y;
@@ -37,20 +38,11 @@ void matMulCPU(float *M, float *N, float *P, int matrixSize) {
 int main()
 {
 	// Sizes of input matrices to test
-	int sizeOfBlock = 1;
-	int sizes[] = {125, 250, 500, 1000, 2000};
-	int blockSizes[] = {2,4,10,20,25};
-	//sizeOfBlock = blockSizes[1];
-	//printf("Block width of: %d\n", sizeOfBlock);
+	int sizes[] = { 125, 250, 500, 1000, 2000 };
 
-	// Loop over matrix sizes
-	for (int x = 0; x < 5; x++) {
-		sizeOfBlock = blockSizes[x];
-		printf("Block width of: %d\n", sizeOfBlock);
-		for (int i = 0; i < 5; i++)
+	for (int i = 0; i < 5; i++)
 	{
 		int size = sizes[i];
-		sizeOfBlock = blockSizes[x];
 		printf("Matrix size is %d by %d\n\n", size, size);
 		size_t hostSize = size * size * sizeof(float);
 
@@ -62,7 +54,6 @@ int main()
 		float* h_N = (float*)malloc(hostSize);
 		float* h_C_GPU = (float*)malloc(hostSize);
 		float* h_C_CPU = (float*)malloc(hostSize);
-
 
 		srand(time(NULL));
 		for (int i = 0; i < size * size; i++) {
@@ -82,35 +73,21 @@ int main()
 		cudaEventCreate(&stop1);
 		cudaEventCreate(&start2);
 		cudaEventCreate(&stop2);
-		
+
 		//Host Multiplication
-		//cudaEventRecord(start1, 0);
-		//matMulCPU(h_M, h_N, h_C_CPU, size);
-		//cudaEventRecord(stop1, 0);
+		cudaEventRecord(start1, 0);
+		matMulCPU(h_M, h_N, h_C_CPU, size);
+		cudaEventRecord(stop1, 0);
 
-		//cudaEventElapsedTime(&gpu_time1, start1, stop1);
-		//printf("Host Multiplication time: %0.2f\n", gpu_time1);
+		cudaEventElapsedTime(&gpu_time1, start1, stop1);
+		printf("Host Multiplication time: %0.2f\n", gpu_time1);
 
-		// Copy input matrices from host to device and measure time
-		//cudaEventRecord(start1);
 		cudaMemcpy(d_M, h_M, hostSize, cudaMemcpyHostToDevice);
 		cudaMemcpy(d_N, h_N, hostSize, cudaMemcpyHostToDevice);
-		// cudaEventRecord(stop1);
-		// cudaEventSynchronize(stop1);
-		// float transfer_time = 0;
-		// cudaEventElapsedTime(&transfer_time, start1, stop1);
-		// printf("Matrix size %d x %d: Host to device transfer time = %f ms\n", size, size, transfer_time);
 
-		int NumBlocks = size / sizeOfBlock;
-		if (size % sizeOfBlock) NumBlocks++;
-
-		dim3 numberOfBlocks(NumBlocks, NumBlocks);
-		dim3 threadsPerBlock(sizeOfBlock, sizeOfBlock);
-	
-		//dim3 numberOfBlocks(size/threadsPerBlock.x, size / threadsPerBlock.y);
-		//intf("%d\n", ceil((size + threadsPerBlock.x - 1) / threadsPerBlock.x));
-		//dim3 numberOfBlocks(ceil((size + threadsPerBlock.x - 1) / threadsPerBlock.x), ceil((size + threadsPerBlock.y - 1) / threadsPerBlock.y));
-
+        //One thread per block and one total block
+        dim3 threadsPerBlock(1,1,1);
+		dim3 numberOfBlocks(ceil(size / (float)threadsPerBlock.x), ceil(size / (float)threadsPerBlock.y), 1);
 
 		// //Part 2 ---------------------------------------------------------------------
 		cudaEventRecord(start2, 0);
@@ -121,25 +98,13 @@ int main()
 		cudaMemcpy(h_C_GPU, d_C, hostSize, cudaMemcpyDeviceToHost);
 		printf("Normal Multiplication time: %0.2f\n", gpu_time2);
 
-		//for (int i = 0; i < size * size; i++) {
-		//	if (abs(h_C_CPU[i] - h_C_GPU[i]) > 0.00001) {
-		//		printf("Test FAILED\n");
-		//		break;
-		//	}
-		//}
-		//printf("Test PASSED\n\n");
-
-		//-----------------------------------------------------------------------------
-
-		// Copy input matrices from device to host and measure time
-		// cudaEventRecord(start1);
-		// cudaMemcpy(h_M, d_M, hostSize, cudaMemcpyDeviceToHost);
-		// cudaMemcpy(h_N, d_N, hostSize, cudaMemcpyDeviceToHost);
-		// cudaEventRecord(stop1);
-		// cudaEventSynchronize(stop1);
-		// transfer_time = 0;
-		// cudaEventElapsedTime(&transfer_time, start1, stop1);
-		// printf("Matrix size %d x %d: Device to host transfer time = %f ms\n", size, size, transfer_time);
+		for (int i = 0; i < size * size; i++) {
+			if (abs(h_C_CPU[i] - h_C_GPU[i]) > 0.00001) {
+				printf("Test FAILED\n");
+				break;
+			}
+		}
+		printf("Test PASSED\n\n");
 
 		// Free memory
 		cudaFreeHost(h_M);
@@ -149,9 +114,6 @@ int main()
 		cudaFree(d_M);
 		cudaFree(d_N);
 		cudaFree(d_C);
-
-	}
-	printf("\n\n");
 	}
 	return 0;
 }

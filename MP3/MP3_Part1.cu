@@ -1,3 +1,6 @@
+//Luka Gobovic
+//20215231
+//MP3 Part 1
 #include <stdio.h>
 #include <stdlib.h>
 #include <cuda_runtime.h>
@@ -5,34 +8,6 @@
 #include <curand.h>
 #include <time.h>
 #include <device_launch_parameters.h>
-
-#define BLOCK_WIDTH 16
-
-__global__ void matrixMultiplication(float *M, float *N, float *P, int matrixSize) {
-	int row = blockIdx.y * blockDim.y + threadIdx.y;
-	int col = blockIdx.x * blockDim.x + threadIdx.x;
-	float sum = 0.0f;
-	if (row < matrixSize && col < matrixSize) {
-		for (int k = 0; k < matrixSize; k++) {
-			sum += M[row * matrixSize + k] * N[k * matrixSize + col];
-		}
-		P[row * matrixSize + col] = sum;
-	}
-}
-
-// Function to perform matrix multiplication on CPU
-void matMulCPU(float *M, float *N, float *P, int matrixSize){
-	for (int i = 0; i < matrixSize; i++) {
-		for (int j = 0; j < matrixSize; j++) {
-			float Pvalue = 0;
-			for (int k = 0; k < matrixSize; k++) {
-				Pvalue += M[j * matrixSize + k] * N[k * matrixSize + i];
-			}
-			P[j * matrixSize + i] = Pvalue;
-		}
-	}
-}
-
 
 int main()
 {

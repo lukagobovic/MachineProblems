@@ -1,3 +1,6 @@
+//Luka Gobovic
+//20215231
+//MP4 Part 2 (BONUS)
 #include <stdio.h>
 #include <stdlib.h>
 #include <cuda_runtime.h>
@@ -9,6 +12,7 @@
 #define BLOCK_WIDTH 16
 #define TILE_WIDTH 8
 
+//CPU Multiply
 void matrix_multiply(float *A, float *B, float *C, int m, int n, int p) {
 	for (int i = 0; i < m; i++) {
 		for (int j = 0; j < p; j++) {
@@ -21,9 +25,7 @@ void matrix_multiply(float *A, float *B, float *C, int m, int n, int p) {
 	}
 }
 
-
-__global__ void tiled_matrix_multiply(float *A, float *B, float *C, int m, int n, int p, int tile_size_x, int tile_size_y)
-{
+__global__ void tiled_matrix_multiply(float *A, float *B, float *C, int m, int n, int p, int tile_size_x, int tile_size_y) {
 	// calculate the row and column indices of the current thread
 	int row = blockIdx.y * tile_size_y + threadIdx.y;
 	int col = blockIdx.x * tile_size_x + threadIdx.x;
@@ -40,39 +42,29 @@ __global__ void tiled_matrix_multiply(float *A, float *B, float *C, int m, int n
 	for (int i = 0; i < (n + tile_size_x - 1) / tile_size_x; ++i)
 	{
 		// check if the current thread is within the bounds of A and B
-		if (row < m && i * tile_size_x + threadIdx.x < n)
-		{
+		if (row < m && i * tile_size_x + threadIdx.x < n) {
 			tile_A[threadIdx.y * tile_size_x + threadIdx.x] = A[row * n + i * tile_size_x + threadIdx.x];
 		}
-		else
-		{
+		else {
 			tile_A[threadIdx.y * tile_size_x + threadIdx.x] = 0;
 		}
-		if (col < p && i * tile_size_x + threadIdx.y < n)
-		{
+		if (col < p && i * tile_size_x + threadIdx.y < n) {
 			tile_B[threadIdx.y * tile_size_x + threadIdx.x] = B[(i * tile_size_x + threadIdx.y) * p + col];
 		}
-		else
-		{
+		else {
 			tile_B[threadIdx.y * tile_size_x + threadIdx.x] = 0;
 		}
-
 		// synchronize threads to ensure tiles have been loaded
 		__syncthreads();
-
 		// perform the matrix multiplication for the current tile
-		for (int j = 0; j < tile_size_x; ++j)
-		{
+		for (int j = 0; j < tile_size_x; ++j) {
 			tile_C += tile_A[threadIdx.y * tile_size_x + j] * tile_B[j * tile_size_x + threadIdx.x];
 		}
-
 		// synchronize threads to ensure previous calculation has completed
 		__syncthreads();
 	}
-
 	// write the result to global memory if within the bounds of C
-	if (row < m && col < p)
-	{
+	if (row < m && col < p) {
 		C[row * p + col] = tile_C;
 	}
 }
@@ -109,32 +101,10 @@ __global__ void tiled_matrix_multiply_noBoundaries(float *A, float *B, float *C,
 
 int main()
 {
-
 	const int M_rows = 350;
 	const int M_cols = 400;
 	const int N_rows = 400;
 	const int N_cols = 500;
-	
-	int size = 400;
-	size_t hostSize = size * size * sizeof(float);
-
-	float* h_M = (float*)malloc(hostSize);
-	float* h_N = (float*)malloc(hostSize);
-	float* h_C_GPU = (float*)malloc(hostSize);
-
-	srand(time(NULL));
-	for (int i = 0; i < size * size; i++) {
-		h_M[i] = (float)rand() / RAND_MAX;
-		h_N[i] = (float)rand() / RAND_MAX;
-	}
-
-	float *d_M, *d_N, *d_C;
-	cudaMalloc(&d_M, hostSize);
-	cudaMalloc(&d_N, hostSize);
-	cudaMalloc(&d_C, hostSize);
-
-	cudaMemcpy(d_M, h_M, hostSize, cudaMemcpyHostToDevice);
-	cudaMemcpy(d_N, h_N, hostSize, cudaMemcpyHostToDevice);
 
 	printf("Matrix M size is %d by %d\n\n", M_rows, M_cols);
 	printf("Matrix N size is %d by %d\n\n", N_rows, N_cols);
@@ -179,18 +149,9 @@ int main()
 	// Kernel configuration
 	const int tile_width = 8;
 	const int tile_height = 15;
-	const int num_blocks_x = (P_cols_d + tile_width - 1) / tile_width;
-	const int num_blocks_y = (P_rows_d + tile_height - 1) / tile_height;
-	
-	//dim3 gridDim((N_cols + tile_width - 1) / tile_width, (M_rows + tile_height - 1) / tile_height, 1);
-	//dim3 blockDim(tile_width, tile_height, 1);
-	//int sharedMemSize = 2 * tile_width * tile_height * sizeof(float);
-
-	//dim3 numberOfBlocks(NumBlocks, NumBlocks);
-	//dim3 threadsPerBlock(sizeOfBlock, sizeOfBlock);
-
-	dim3 threadsPerBlock(TILE_WIDTH, TILE_WIDTH);
-	dim3 numberOfBlocks(size / TILE_WIDTH, size / TILE_WIDTH);
+	dim3 gridDim((N_cols + tile_width - 1) / tile_width, (M_rows + tile_height - 1) / tile_height, 1);
+	dim3 blockDim(tile_width, tile_height, 1);
+	int sharedMemSize = 2 * tile_width * tile_height * sizeof(float);
 
 	float gpu_time1 = 0.0f;
 	float gpu_time2 = 0.0f;
@@ -210,20 +171,15 @@ int main()
 	cudaEventElapsedTime(&gpu_time1, start1, stop1);
 	printf("Host Multiplication time: %0.2f\n", gpu_time1);
 
-
-	// //Part 2 ---------------------------------------------------------------------
+	//---------------------------------------------------------------
 	cudaEventRecord(start2, 0);
-	tiled_matrix_multiply_noBoundaries << < numberOfBlocks, threadsPerBlock >> >(d_M, d_N, d_C, size);
-	//tiled_matrix_multiply<<<gridDim, blockDim, sharedMemSize >> > (M_d, N_d, P_d, M_rows_d, M_cols_d, N_cols_d, tile_width, tile_height);
+	tiled_matrix_multiply << <gridDim, blockDim, sharedMemSize >> > (M_d, N_d, P_d, M_rows_d, M_cols_d, N_cols_d, tile_width, tile_height);
 	cudaDeviceSynchronize();
 	cudaEventRecord(stop2, 0);
 	cudaEventSynchronize(stop2);
 	cudaEventElapsedTime(&gpu_time2, start2, stop2);
-	cudaMemcpy(h_C_GPU, d_C, hostSize, cudaMemcpyDeviceToHost);
-	//cudaMemcpy(P, P_d, P_rows_d * P_cols_d * sizeof(float), cudaMemcpyDeviceToHost);
-	//printf("Tiled Boundary Multiplication time: %0.2f\n", gpu_time2);
-	printf("Tiled Multiplication time: %0.2f\n", gpu_time2);
-
+	cudaMemcpy(P, P_d, P_rows_d * P_cols_d * sizeof(float), cudaMemcpyDeviceToHost);
+	printf("Tiled Boundary Multiplication time: %0.2f\n", gpu_time2);
 
 	int passedFlag = 1;
 	for (int i = 0; i < M_rows * N_cols; i++) {
@@ -239,8 +195,6 @@ int main()
 		printf("Test FAILED\n");
 	}
 
-
-
 	// Free memory
 	free(M);
 	free(N);
@@ -248,13 +202,6 @@ int main()
 	cudaFree(M_d);
 	cudaFree(N_d);
 	cudaFree(P_d);
-
-	cudaFreeHost(h_M);
-	cudaFreeHost(h_N);
-	cudaFreeHost(h_C_GPU);
-	cudaFree(d_M);
-	cudaFree(d_N);
-	cudaFree(d_C);
 
 	return 0;
 }
